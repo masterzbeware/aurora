@@ -1,5 +1,5 @@
 -- Commands/Order.lua
--- Aurora Logger + Auto Webhook System (Fixed Sequence + Inline Embed + Save AuroraStats)
+-- Aurora Logger + Auto Webhook System (Fixed + Inline Embed + GitHub Auto Update)
 
 return {
   Execute = function(tab)
@@ -17,10 +17,8 @@ return {
       end
 
       -------------------------------------------------
-      -- 🔹 Group utama
+      -- 🔹 Service dan Variabel
       -------------------------------------------------
-      local Group = MainTab:AddLeftGroupbox("Aurora Totem")
-
       local Players = game:GetService("Players")
       local ReplicatedStorage = game:GetService("ReplicatedStorage")
       local HttpService = game:GetService("HttpService")
@@ -40,7 +38,7 @@ return {
       end
 
       -------------------------------------------------
-      -- 🔹 Variabel & Webhook
+      -- 🔹 Webhook dan Variabel Bot
       -------------------------------------------------
       local webhookURL = "https://discord.com/api/webhooks/1426999320590422237/MRBvIpOriZD1sJGd--F2A4RfFYEMdXEvPFHOJ5ZyUjogYlUEeDLkWpGcc0ZI4vn43ofR"
 
@@ -50,31 +48,10 @@ return {
       vars.AutoSystemRunning = vars.AutoSystemRunning or false
 
       -------------------------------------------------
-      -- 🔹 Fungsi Simpan Data Aurora ke File Lokal
+      -- 🔹 Tab dan UI
       -------------------------------------------------
-      local function saveAuroraData(username, jumlahPop, jumlahPesanan)
-          local statsUrl = "https://raw.githubusercontent.com/masterzbeware/aurora/main/data/AuroraStats.lua"
-          local localPath = "AuroraStats.lua"
+      local Group = MainTab:AddLeftGroupbox("Aurora Totem")
 
-          local success, result = pcall(function()
-              return game:HttpGet(statsUrl)
-          end)
-
-          if not success or not result then
-              warn("[Aurora Logger] Gagal ambil AuroraStats.lua dari repo.")
-              return
-          end
-
-          local newLine = string.format('    { "%s", "%s", "%s" },', username, jumlahPop, jumlahPesanan)
-          local updated = result:gsub("}%s*$", newLine .. "\n}")
-
-          writefile(localPath, updated)
-          print("[Aurora Logger] ✅ Data AuroraStats diperbarui dan disimpan ke file lokal.")
-      end
-
-      -------------------------------------------------
-      -- 🔹 Dropdown Player
-      -------------------------------------------------
       local function getPlayerList()
           local list = {}
           for _, plr in ipairs(Players:GetPlayers()) do
@@ -98,9 +75,6 @@ return {
           Library:Notify("Daftar player diperbarui.", 3)
       end)
 
-      -------------------------------------------------
-      -- 🔹 Input jumlah Pop & Pesanan
-      -------------------------------------------------
       Group:AddInput("AuroraPopInput", {
           Default = "",
           Text = "Jumlah Aurora di-Pop",
@@ -147,14 +121,14 @@ return {
 
       local function useTool(tool)
           if tool and tool:IsA("Tool") then
-              task.wait(0.4)
+              task.wait(0.3)
               tool:Activate()
               print("[Use] " .. tool.Name)
           end
       end
 
       -------------------------------------------------
-      -- 🔹 Fungsi Kirim Webhook
+      -- 🔹 Kirim Webhook
       -------------------------------------------------
       local function sendWebhook()
           if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
@@ -163,7 +137,7 @@ return {
           end
 
           local payload = {
-              embeds = { {
+              embeds = {{
                   title = "AURORA POP TOTEM",
                   color = 3447003,
                   fields = {
@@ -175,7 +149,7 @@ return {
                   },
                   footer = { text = "Dikirim otomatis dari Aurora Logger" },
                   timestamp = DateTime.now():ToIsoDate()
-              } }
+              }}
           }
 
           local req = syn and syn.request or request or http_request or (http and http.request)
@@ -195,14 +169,92 @@ return {
 
           if success then
               Library:Notify("Webhook terkirim! Aurora Borealis aktif!", 4)
-              saveAuroraData(vars.SelectedPlayer, vars.JumlahPop, vars.JumlahPesanan)
+              updateAuroraStatsOnGitHub() -- 🔹 auto update ke GitHub
           else
               Library:Notify("Gagal mengirim webhook: " .. tostring(err), 4)
           end
       end
 
       -------------------------------------------------
-      -- 🔹 Auto Sequence (baru)
+      -- 🔹 Auto Update AuroraStats.lua ke GitHub
+      -------------------------------------------------
+      function updateAuroraStatsOnGitHub()
+          local config = loadfile("Config.lua")()
+          local token = config.githubToken
+          if token == "TOKEN_NOT_FOUND" then
+              warn("[Aurora Logger] Token GitHub tidak ditemukan di .env")
+              return
+          end
+
+          local user = config.githubUser
+          local repo = config.githubRepo
+          local path = config.statsPath
+
+          -- Data yang akan dikirim
+          local data = {
+              player = vars.SelectedPlayer,
+              jumlah_pop = vars.JumlahPop,
+              jumlah_pesanan = vars.JumlahPesanan,
+              cycle = cycle.Value,
+              weather = weather.Value,
+              timestamp = DateTime.now():ToIsoDate()
+          }
+
+          local jsonData = HttpService:JSONEncode(data)
+          local base64Content = game:GetService("HttpService"):UrlEncode(jsonData)
+
+          local req = syn and syn.request or request or http_request or (http and http.request)
+          if not req then
+              Library:Notify("Executor tidak mendukung HTTP Request!", 4)
+              return
+          end
+
+          local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", user, repo, path)
+          local getResponse = req({
+              Url = url,
+              Method = "GET",
+              Headers = {
+                  ["Authorization"] = "token " .. token,
+                  ["User-Agent"] = "AuroraLogger"
+              }
+          })
+
+          local sha
+          if getResponse and getResponse.Body then
+              local ok, body = pcall(function()
+                  return HttpService:JSONDecode(getResponse.Body)
+              end)
+              if ok and body.sha then
+                  sha = body.sha
+              end
+          end
+
+          local patchBody = {
+              message = "Auto update AuroraStats.lua from Aurora Logger",
+              content = base64Content,
+              sha = sha
+          }
+
+          local patchResponse = req({
+              Url = url,
+              Method = "PUT",
+              Headers = {
+                  ["Authorization"] = "token " .. token,
+                  ["User-Agent"] = "AuroraLogger",
+                  ["Content-Type"] = "application/json"
+              },
+              Body = HttpService:JSONEncode(patchBody)
+          })
+
+          if patchResponse and patchResponse.StatusCode == 200 then
+              Library:Notify("✅ AuroraStats.lua berhasil diupdate ke GitHub!", 4)
+          else
+              warn("[Aurora Logger] Gagal update AuroraStats.lua:", patchResponse and patchResponse.Body)
+          end
+      end
+
+      -------------------------------------------------
+      -- 🔹 Auto Webhook Sequence
       -------------------------------------------------
       local function startAutoSequence()
           if vars.AutoSystemRunning then
@@ -226,49 +278,37 @@ return {
               if aurora then
                   useTool(aurora)
                   Library:Notify("Aurora Totem digunakan.", 3)
-                  sendWebhook()
+
+                  if weather.Value ~= "Aurora_Borealis" then
+                      Library:Notify("Menunggu Aurora Borealis aktif...", 4)
+                      local connection
+                      connection = weather:GetPropertyChangedSignal("Value"):Connect(function()
+                          if weather.Value == "Aurora_Borealis" then
+                              Library:Notify("Aurora Borealis aktif! Mengirim webhook...", 4)
+                              sendWebhook()
+                              connection:Disconnect()
+                          end
+                      end)
+                  else
+                      sendWebhook()
+                  end
               end
           end
 
-          -------------------------------------------------
-          -- Jalur Night → Day → Night
-          -------------------------------------------------
-          if cycle.Value == "Night" then
-              Library:Notify("Mode: Night - Memulai siklus panjang.", 4)
+          if cycle.Value == "Day" then
               equipAndUseSundial()
-
-              local c1
-              c1 = cycle:GetPropertyChangedSignal("Value"):Connect(function()
-                  if cycle.Value == "Day" then
-                      equipAndUseSundial()
-                      Library:Notify("Menunggu Night berikutnya...", 4)
-
-                      local c2
-                      c2 = cycle:GetPropertyChangedSignal("Value"):Connect(function()
-                          if cycle.Value == "Night" then
-                              equipAndUseAurora()
-                              Library:Notify("Menjalankan Aurora Totem & Kirim Webhook", 4)
-                              c2:Disconnect()
-                          end
-                      end)
-
-                      c1:Disconnect()
-                  end
-              end)
-
-          -------------------------------------------------
-          -- Jalur Day → Night
-          -------------------------------------------------
-          elseif cycle.Value == "Day" then
-              Library:Notify("Mode: Day - Menunggu Night...", 4)
-              equipAndUseSundial()
-
-              local c3
-              c3 = cycle:GetPropertyChangedSignal("Value"):Connect(function()
+              Library:Notify("Menunggu Night...", 3)
+              cycle:GetPropertyChangedSignal("Value"):Connect(function()
                   if cycle.Value == "Night" then
                       equipAndUseAurora()
-                      Library:Notify("Menjalankan Aurora Totem & Kirim Webhook", 4)
-                      c3:Disconnect()
+                  end
+              end)
+          elseif cycle.Value == "Night" then
+              equipAndUseSundial()
+              Library:Notify("Menunggu Day untuk reset...", 3)
+              cycle:GetPropertyChangedSignal("Value"):Connect(function()
+                  if cycle.Value == "Day" then
+                      equipAndUseSundial()
                   end
               end)
           end
