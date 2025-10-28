@@ -1,2 +1,2 @@
-# Ignore environment files
-.env
+# Ignore local secret config
+Config/secret.lua
