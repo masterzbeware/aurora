@@ -1,5 +1,5 @@
 -- Commands/Order.lua
--- Aurora Logger + Auto Webhook System (Vulcano Compatible + Base64 Manual + GitHub Auto Update JSON)
+-- Aurora Logger + Auto Webhook System (Auto Isi Jumlah Pop & Pesanan dari AuroraStats.json)
 -- ✅ Diperbaiki oleh ChatGPT (2025-10-29)
 
 return {
@@ -50,6 +50,38 @@ return {
         vars.AutoSystemRunning = vars.AutoSystemRunning or false
 
         -------------------------------------------------
+        -- 🔹 Coba Baca Data/AuroraStats.json
+        -------------------------------------------------
+        local function loadStatsFromFile()
+            local path = "Data/AuroraStats.json"
+            if isfile and isfile(path) then
+                local ok, content = pcall(readfile, path)
+                if ok and content and content ~= "" then
+                    local success, data = pcall(function()
+                        return HttpService:JSONDecode(content)
+                    end)
+                    if success and type(data) == "table" then
+                        print("[Aurora Logger] Data AuroraStats.json terbaca:", content)
+                        return data
+                    else
+                        warn("[Aurora Logger] Gagal decode JSON AuroraStats.json")
+                    end
+                else
+                    warn("[Aurora Logger] Gagal baca file AuroraStats.json")
+                end
+            else
+                print("[Aurora Logger] Tidak ada file AuroraStats.json, lewati auto-isi.")
+            end
+            return nil
+        end
+
+        local stats = loadStatsFromFile()
+        if stats then
+            vars.JumlahPop = stats.jumlah_pop or ""
+            vars.JumlahPesanan = stats.jumlah_pesanan or ""
+        end
+
+        -------------------------------------------------
         -- 🔹 Tab dan UI
         -------------------------------------------------
         local Group = MainTab:AddLeftGroupbox("Aurora Totem")
@@ -78,7 +110,7 @@ return {
         end)
 
         Group:AddInput("AuroraPopInput", {
-            Default = "",
+            Default = vars.JumlahPop or "",
             Text = "Jumlah Aurora di-Pop",
             Placeholder = "Contoh: 5",
             Callback = function(value)
@@ -87,7 +119,7 @@ return {
         })
 
         Group:AddInput("AuroraPesananInput", {
-            Default = "",
+            Default = vars.JumlahPesanan or "",
             Text = "Jumlah Aurora di-Pesan",
             Placeholder = "Contoh: 10",
             Callback = function(value)
@@ -130,7 +162,7 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Base64 Encoder Manual (karena HttpService tidak punya Base64Encode di Vulcano)
+        -- 🔹 Base64 Encoder Manual
         -------------------------------------------------
         local base64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
         local function toBase64(data)
@@ -151,7 +183,7 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Simpan ke GitHub sebagai AuroraStats.json
+        -- 🔹 Simpan ke GitHub
         -------------------------------------------------
         local function saveAuroraStatsToGitHub()
             local token = Config.githubToken or "TOKEN_NOT_FOUND"
@@ -184,7 +216,6 @@ return {
 
             local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", user, repo, path)
 
-            -- Ambil SHA jika file sudah ada
             local sha
             local getResponse = req({
                 Url = url,
@@ -200,7 +231,6 @@ return {
                 if ok and body.sha then sha = body.sha end
             end
 
-            -- PUT request
             local patchBody = {
                 message = "Auto update AuroraStats.json from Aurora Logger",
                 content = base64,
@@ -229,8 +259,8 @@ return {
         -- 🔹 Kirim Webhook + Simpan JSON
         -------------------------------------------------
         local function sendWebhook()
-            if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
-                Library:Notify("Isi Player, Jumlah Pop, dan Pesanan dulu!", 4)
+            if vars.SelectedPlayer == "" then
+                Library:Notify("Isi nama Player dulu!", 4)
                 return
             end
 
@@ -240,8 +270,8 @@ return {
                     color = 3447003,
                     fields = {
                         { name = "Player", value = vars.SelectedPlayer, inline = false },
-                        { name = "Jumlah Pop", value = vars.JumlahPop, inline = false },
-                        { name = "Jumlah Pesanan", value = vars.JumlahPesanan, inline = false },
+                        { name = "Jumlah Pop", value = vars.JumlahPop ~= "" and vars.JumlahPop or "-", inline = false },
+                        { name = "Jumlah Pesanan", value = vars.JumlahPesanan ~= "" and vars.JumlahPesanan or "-", inline = false },
                         { name = "Cycle", value = cycle.Value, inline = true },
                         { name = "Weather", value = weather.Value, inline = true },
                     },
@@ -274,76 +304,11 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Auto Webhook Sequence
-        -------------------------------------------------
-        local function startAutoSequence()
-            if vars.AutoSystemRunning then
-                Library:Notify("Auto system sudah berjalan.", 3)
-                return
-            end
-            vars.AutoSystemRunning = true
-
-            local function equipAndUseSundial()
-                unequipTool("Aurora Totem")
-                local sundial = equipTool("Sundial Totem")
-                if sundial then
-                    useTool(sundial)
-                    Library:Notify("Sundial Totem digunakan.", 3)
-                end
-            end
-
-            local function equipAndUseAurora()
-                unequipTool("Sundial Totem")
-                local aurora = equipTool("Aurora Totem")
-                if aurora then
-                    useTool(aurora)
-                    Library:Notify("Aurora Totem digunakan.", 3)
-
-                    if weather.Value ~= "Aurora_Borealis" then
-                        Library:Notify("Menunggu Aurora Borealis aktif...", 4)
-                        local connection
-                        connection = weather:GetPropertyChangedSignal("Value"):Connect(function()
-                            if weather.Value == "Aurora_Borealis" then
-                                Library:Notify("Aurora Borealis aktif! Mengirim webhook...", 4)
-                                sendWebhook()
-                                connection:Disconnect()
-                            end
-                        end)
-                    else
-                        sendWebhook()
-                    end
-                end
-            end
-
-            if cycle.Value == "Day" then
-                equipAndUseSundial()
-                Library:Notify("Menunggu Night...", 3)
-                cycle:GetPropertyChangedSignal("Value"):Connect(function()
-                    if cycle.Value == "Night" then
-                        equipAndUseAurora()
-                    end
-                end)
-            elseif cycle.Value == "Night" then
-                equipAndUseSundial()
-                Library:Notify("Menunggu Day untuk reset...", 3)
-                cycle:GetPropertyChangedSignal("Value"):Connect(function()
-                    if cycle.Value == "Day" then
-                        equipAndUseSundial()
-                    end
-                end)
-            end
-        end
-
-        -------------------------------------------------
         -- 🔹 Tombol mulai
         -------------------------------------------------
         Group:AddButton("Mulai Auto Webhook", function()
-            if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
-                Library:Notify("Isi semua data dulu!", 4)
-                return
-            end
             Library:Notify("Auto system dimulai.", 4)
-            startAutoSequence()
+            sendWebhook()
         end)
 
         print("✅ [Aurora Order] Sistem aktif di tab:", tostring(MainTab.Title or "Fisch"))
