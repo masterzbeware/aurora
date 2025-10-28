@@ -76,7 +76,7 @@ _G.BotVars = {
 ---------------------------------------------------
 local MainWindow = Library:CreateWindow({
     Title = "OctoraStore | Roblox",
-    Footer = "1.3.0",
+    Footer = "1.0.0",
     Icon = 0,
 })
 
