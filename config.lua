@@ -11,8 +11,5 @@ return {
 
   githubUser = "masterzbeware",
   githubRepo = "aurora",
-
-  -- 🔹 Jalur file yang akan digunakan untuk menyimpan AuroraStats.json
-  -- Pastikan folder "Data" sudah dibuat di repo GitHub kamu (case-sensitive)
   statsPath = "Data/AuroraStats.json"
 }
