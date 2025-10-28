@@ -44,6 +44,8 @@ local AuroraGroup = Tabs.Info:AddRightGroupbox("Aurora Stats")
 local playerLabel = AuroraGroup:AddLabel("Player: ...")
 local popLabel = AuroraGroup:AddLabel("Jumlah Pop: ...")
 local orderLabel = AuroraGroup:AddLabel("Jumlah Pesanan: ...")
+local weatherLabel = AuroraGroup:AddLabel("Weather: ...")
+local cycleLabel = AuroraGroup:AddLabel("Cycle: ...")
 
 -- Fungsi untuk memuat data dari AuroraStats.json
 local function updateAuroraStats()
@@ -57,8 +59,10 @@ local function updateAuroraStats()
         -- Jika belum ada file, buat dummy
         local dummy = {
             player = game.Players.LocalPlayer and game.Players.LocalPlayer.Name or "Unknown",
-            pop = 0,
-            orders = 0
+            jumlah_pop = "0",
+            jumlah_pesanan = "0",
+            weather = "Unknown",
+            cycle = "Unknown"
         }
         writefile(statsPath, game:GetService("HttpService"):JSONEncode(dummy))
     end
@@ -70,8 +74,10 @@ local function updateAuroraStats()
 
     if success and type(data) == "table" then
         playerLabel:SetText("Player: " .. tostring(data.player or "N/A"))
-        popLabel:SetText("Jumlah Pop: " .. tostring(data.pop or 0))
-        orderLabel:SetText("Jumlah Pesanan: " .. tostring(data.orders or 0))
+        popLabel:SetText("Jumlah Pop: " .. tostring(data.jumlah_pop or 0))
+        orderLabel:SetText("Jumlah Pesanan: " .. tostring(data.jumlah_pesanan or 0))
+        weatherLabel:SetText("Weather: " .. tostring(data.weather or "N/A"))
+        cycleLabel:SetText("Cycle: " .. tostring(data.cycle or "N/A"))
     else
         warn("[AuroraStats] Gagal membaca JSON.")
     end
@@ -82,7 +88,7 @@ updateAuroraStats()
 
 -- Loop update tiap 5 detik
 task.spawn(function()
-    while task.wait(5) do
+    while task.wait(3) do
         pcall(updateAuroraStats)
     end
 end)
