@@ -153,7 +153,7 @@ return {
           }
 
           local jsonData = HttpService:JSONEncode(data)
-          local base64 = game:GetService("HttpService"):UrlEncode(jsonData)
+          local base64 = game:GetService("HttpService"):Base64Encode(jsonData)
 
           local req = syn and syn.request or request or http_request or (http and http.request)
           if not req then
