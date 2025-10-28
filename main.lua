@@ -1,15 +1,21 @@
 -- main.lua
 -- MasterZ HUB Loader (tanpa VIP)
 
--- Repositori
+---------------------------------------------------
+-- 🔹 Repositori
+---------------------------------------------------
 local repoBase = "https://raw.githubusercontent.com/masterzbeware/aurora/main/Commands/"
 local obsidianRepo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local configRepo = "https://raw.githubusercontent.com/masterzbeware/aurora/main/config.lua"
 
--- Load Library
+---------------------------------------------------
+-- 🔹 Load Library
+---------------------------------------------------
 local Library = loadstring(game:HttpGet(obsidianRepo .. "Library.lua"))()
 
--- Debug print
+---------------------------------------------------
+-- 🔹 Debug print helper
+---------------------------------------------------
 local function debugPrint(msg)
     print("[OctoraStore | Roblox] " .. tostring(msg))
 end
@@ -26,6 +32,20 @@ end)
 if success and type(result) == "table" then
     config = result
     debugPrint("✅ Config.lua berhasil dimuat dari GitHub.")
+
+    ---------------------------------------------------
+    -- 🧠 Tambahan: ambil token dari file lokal
+    ---------------------------------------------------
+    local ok, localToken = pcall(function()
+        return loadfile("token.lua")()
+    end)
+
+    if ok and type(localToken) == "string" and localToken ~= "" then
+        config.githubToken = localToken
+        debugPrint("🔒 Token GitHub dimuat dari file lokal (token.lua).")
+    else
+        warn("⚠️ Gagal memuat token lokal, update ke GitHub tidak akan berfungsi.")
+    end
 else
     warn("[OctoraStore] Gagal memuat config.lua dari GitHub:", result)
     config = {
@@ -45,7 +65,7 @@ _G.BotVars = {
     RunService = game:GetService("RunService"),
     LocalPlayer = game:GetService("Players").LocalPlayer,
     ToggleAktif = false,
-    Config = config, -- ⬅️ simpan config ke variabel global
+    Config = config, -- simpan config ke variabel global
 }
 
 ---------------------------------------------------

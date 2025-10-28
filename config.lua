@@ -1,10 +1,5 @@
--- Config/config.lua
-local success, secret = pcall(function()
-  return loadfile("Config/secret.lua")()
-end)
-
 return {
-  githubToken = (success and secret.githubToken) or "TOKEN_NOT_FOUND",
+  githubToken = "TOKEN_NOT_FOUND", -- nanti diisi otomatis
   githubUser = "masterzbeware",
   githubRepo = "aurora",
   statsPath = "data/AuroraStats.lua"

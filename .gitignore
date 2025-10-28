@@ -1,2 +1,1 @@
-# Ignore local secret config
-Config/secret.lua
+token.lua
