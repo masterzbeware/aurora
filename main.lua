@@ -4,6 +4,7 @@
 -- Repositori
 local repoBase = "https://raw.githubusercontent.com/masterzbeware/aurora/main/Commands/"
 local obsidianRepo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local configRepo = "https://raw.githubusercontent.com/masterzbeware/aurora/main/config.lua"
 
 -- Load Library
 local Library = loadstring(game:HttpGet(obsidianRepo .. "Library.lua"))()
@@ -13,31 +14,57 @@ local function debugPrint(msg)
     print("[OctoraStore | Roblox] " .. tostring(msg))
 end
 
--- Global Variabel
+---------------------------------------------------
+-- 🔹 Load Config dari GitHub
+---------------------------------------------------
+local config = nil
+local success, result = pcall(function()
+    local code = game:HttpGet(configRepo)
+    return loadstring(code)()
+end)
+
+if success and type(result) == "table" then
+    config = result
+    debugPrint("✅ Config.lua berhasil dimuat dari GitHub.")
+else
+    warn("[OctoraStore] Gagal memuat config.lua dari GitHub:", result)
+    config = {
+        githubToken = "TOKEN_NOT_FOUND",
+        githubUser = "unknown",
+        githubRepo = "unknown",
+        statsPath = "data/AuroraStats.lua"
+    }
+end
+
+---------------------------------------------------
+-- 🔹 Global Variabel
+---------------------------------------------------
 _G.BotVars = {
     Players = game:GetService("Players"),
     TextChatService = game:GetService("TextChatService"),
     RunService = game:GetService("RunService"),
     LocalPlayer = game:GetService("Players").LocalPlayer,
     ToggleAktif = false,
+    Config = config, -- ⬅️ simpan config ke variabel global
 }
 
--- Buat Window Utama
+---------------------------------------------------
+-- 🔹 Buat Window Utama
+---------------------------------------------------
 local MainWindow = Library:CreateWindow({
     Title = "OctoraStore | Roblox",
     Footer = "1.5.0",
     Icon = 0,
 })
 
--- Simpan ke _G agar dapat diakses oleh module lain
 _G.BotVars.Library = Library
 _G.BotVars.MainWindow = MainWindow
 
 ---------------------------------------------------
--- ✅ Fungsi untuk load semua script dari repo
+-- 🔹 Fungsi untuk load semua script dari repo
 ---------------------------------------------------
 local LoadedModules = {}
-local commandFiles = {"WindowTab.lua", "Order.lua"} -- urutan penting: Tab dulu, baru lainnya
+local commandFiles = {"WindowTab.lua", "Order.lua"} -- urutan penting
 
 local function loadScripts(files, repo, targetTable)
     for _, fileName in ipairs(files) do
@@ -67,11 +94,13 @@ local function loadScripts(files, repo, targetTable)
     end
 end
 
--- Load semua file command
+---------------------------------------------------
+-- 🔹 Load semua command
+---------------------------------------------------
 loadScripts(commandFiles, repoBase, LoadedModules)
 
 ---------------------------------------------------
--- ✅ Jalankan module yang memiliki fungsi Execute()
+-- 🔹 Jalankan module yang memiliki fungsi Execute()
 ---------------------------------------------------
 for name, module in pairs(LoadedModules) do
     if type(module) == "table" and module.Execute then

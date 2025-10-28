@@ -1,5 +1,5 @@
 -- Commands/Order.lua
--- Aurora Logger + Auto Webhook System (Fixed + Inline Embed + GitHub Auto Update)
+-- Aurora Logger + Auto Webhook System (Fixed + Inline Embed + GitHub Auto Update JSON)
 
 return {
   Execute = function(tab)
@@ -10,6 +10,7 @@ return {
       local Tabs = vars.Tabs or {}
       local Library = vars.Library
       local MainTab = tab or Tabs.Fisch
+      local Config = vars.Config or {}
 
       if not Library or not MainTab then
           warn("[Aurora Logger] Gagal inisialisasi — Library atau Tab tidak ditemukan.")
@@ -128,7 +129,80 @@ return {
       end
 
       -------------------------------------------------
-      -- 🔹 Kirim Webhook
+      -- 🔹 Simpan ke GitHub sebagai AuroraStats.json
+      -------------------------------------------------
+      local function saveAuroraStatsToGitHub()
+          local token = Config.githubToken or "TOKEN_NOT_FOUND"
+          if token == "TOKEN_NOT_FOUND" then
+              warn("[Aurora Logger] Token GitHub tidak ditemukan di Config.")
+              return
+          end
+
+          local user = Config.githubUser or "unknown"
+          local repo = Config.githubRepo or "aurora"
+          local path = Config.statsPath or "AuroraStats.json"
+
+          -- 🔹 Data yang akan dikirim
+          local data = {
+              player = vars.SelectedPlayer,
+              jumlah_pop = vars.JumlahPop,
+              jumlah_pesanan = vars.JumlahPesanan,
+              cycle = cycle.Value,
+              weather = weather.Value,
+              timestamp = DateTime.now():ToIsoDate()
+          }
+
+          local jsonData = HttpService:JSONEncode(data)
+          local base64 = game:GetService("HttpService"):UrlEncode(jsonData)
+
+          local req = syn and syn.request or request or http_request or (http and http.request)
+          if not req then
+              Library:Notify("Executor tidak mendukung HTTP Request!", 4)
+              return
+          end
+
+          local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", user, repo, path)
+          local getResponse = req({
+              Url = url,
+              Method = "GET",
+              Headers = {
+                  ["Authorization"] = "token " .. token,
+                  ["User-Agent"] = "AuroraLogger"
+              }
+          })
+
+          local sha
+          if getResponse and getResponse.Body then
+              local ok, body = pcall(function() return HttpService:JSONDecode(getResponse.Body) end)
+              if ok and body.sha then sha = body.sha end
+          end
+
+          local patchBody = {
+              message = "Auto update AuroraStats.json from Aurora Logger",
+              content = base64,
+              sha = sha
+          }
+
+          local response = req({
+              Url = url,
+              Method = "PUT",
+              Headers = {
+                  ["Authorization"] = "token " .. token,
+                  ["User-Agent"] = "AuroraLogger",
+                  ["Content-Type"] = "application/json"
+              },
+              Body = HttpService:JSONEncode(patchBody)
+          })
+
+          if response and response.StatusCode == 200 then
+              Library:Notify("✅ AuroraStats.json berhasil disimpan ke GitHub!", 4)
+          else
+              warn("[Aurora Logger] Gagal menyimpan AuroraStats.json:", response and response.Body)
+          end
+      end
+
+      -------------------------------------------------
+      -- 🔹 Kirim Webhook + Simpan JSON
       -------------------------------------------------
       local function sendWebhook()
           if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
@@ -169,87 +243,9 @@ return {
 
           if success then
               Library:Notify("Webhook terkirim! Aurora Borealis aktif!", 4)
-              updateAuroraStatsOnGitHub() -- 🔹 auto update ke GitHub
+              saveAuroraStatsToGitHub() -- 🔹 simpan JSON otomatis
           else
               Library:Notify("Gagal mengirim webhook: " .. tostring(err), 4)
-          end
-      end
-
-      -------------------------------------------------
-      -- 🔹 Auto Update AuroraStats.lua ke GitHub
-      -------------------------------------------------
-      function updateAuroraStatsOnGitHub()
-          local config = loadfile("Config.lua")()
-          local token = config.githubToken
-          if token == "TOKEN_NOT_FOUND" then
-              warn("[Aurora Logger] Token GitHub tidak ditemukan di .env")
-              return
-          end
-
-          local user = config.githubUser
-          local repo = config.githubRepo
-          local path = config.statsPath
-
-          -- Data yang akan dikirim
-          local data = {
-              player = vars.SelectedPlayer,
-              jumlah_pop = vars.JumlahPop,
-              jumlah_pesanan = vars.JumlahPesanan,
-              cycle = cycle.Value,
-              weather = weather.Value,
-              timestamp = DateTime.now():ToIsoDate()
-          }
-
-          local jsonData = HttpService:JSONEncode(data)
-          local base64Content = game:GetService("HttpService"):UrlEncode(jsonData)
-
-          local req = syn and syn.request or request or http_request or (http and http.request)
-          if not req then
-              Library:Notify("Executor tidak mendukung HTTP Request!", 4)
-              return
-          end
-
-          local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", user, repo, path)
-          local getResponse = req({
-              Url = url,
-              Method = "GET",
-              Headers = {
-                  ["Authorization"] = "token " .. token,
-                  ["User-Agent"] = "AuroraLogger"
-              }
-          })
-
-          local sha
-          if getResponse and getResponse.Body then
-              local ok, body = pcall(function()
-                  return HttpService:JSONDecode(getResponse.Body)
-              end)
-              if ok and body.sha then
-                  sha = body.sha
-              end
-          end
-
-          local patchBody = {
-              message = "Auto update AuroraStats.lua from Aurora Logger",
-              content = base64Content,
-              sha = sha
-          }
-
-          local patchResponse = req({
-              Url = url,
-              Method = "PUT",
-              Headers = {
-                  ["Authorization"] = "token " .. token,
-                  ["User-Agent"] = "AuroraLogger",
-                  ["Content-Type"] = "application/json"
-              },
-              Body = HttpService:JSONEncode(patchBody)
-          })
-
-          if patchResponse and patchResponse.StatusCode == 200 then
-              Library:Notify("✅ AuroraStats.lua berhasil diupdate ke GitHub!", 4)
-          else
-              warn("[Aurora Logger] Gagal update AuroraStats.lua:", patchResponse and patchResponse.Body)
           end
       end
 
