@@ -1,5 +1,6 @@
 -- Commands/Order.lua
--- Aurora Logger + Auto Webhook System (Vulcano Compatible + Base64 Manual + GitHub Auto Update JSON + Auto Fill Player Data)
+-- Aurora Logger + Auto Webhook System
+-- (Vulcano Compatible + Base64 Manual + GitHub Auto Update JSON)
 
 return {
     Execute = function(tab)
@@ -18,7 +19,7 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Service dan Variabel
+        -- 🔹 Service Roblox
         -------------------------------------------------
         local Players = game:GetService("Players")
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,7 +40,7 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Webhook dan Variabel Bot
+        -- 🔹 Variabel bot dan webhook
         -------------------------------------------------
         local webhookURL = "https://discord.com/api/webhooks/1426999320590422237/MRBvIpOriZD1sJGd--F2A4RfFYEMdXEvPFHOJ5ZyUjogYlUEeDLkWpGcc0ZI4vn43ofR"
 
@@ -49,7 +50,7 @@ return {
         vars.AutoSystemRunning = vars.AutoSystemRunning or false
 
         -------------------------------------------------
-        -- 🔹 Tab dan UI
+        -- 🔹 UI: Tab & Input
         -------------------------------------------------
         local Group = MainTab:AddLeftGroupbox("Aurora Totem")
 
@@ -61,158 +62,41 @@ return {
             return list
         end
 
-        -------------------------------------------------
-        -- 🔸 FITUR: Auto load data AuroraStats.json dari GitHub
-        -------------------------------------------------
-        local AuroraStatsCache = {}
-
-        local function toBase64(data)
-            local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-            return ((data:gsub('.', function(x)
-                local r, b = '', x:byte()
-                for i = 8, 1, -1 do
-                    r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and '1' or '0')
-                end
-                return r
-            end) .. '0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
-                if #x < 6 then return '' end
-                local c = 0
-                for i = 1, 6 do
-                    c = c + (x:sub(i, i) == '1' and 2 ^ (6 - i) or 0)
-                end
-                return b:sub(c + 1, c + 1)
-            end) .. ({ '', '==', '=' })[#data % 3 + 1])
-        end
-
-        local function fromBase64(data)
-            local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-            data = data:gsub('[^'..b..'=]', '')
-            return (data:gsub('.', function(x)
-                if x == '=' then return '' end
-                local r, f = '', (b:find(x) - 1)
-                for i = 6, 1, -1 do
-                    r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0')
-                end
-                return r
-            end):gsub('%d%d%d%d%d%d%d%d', function(x)
-                local c = 0
-                for i = 1, 8 do
-                    c = c + (x:sub(i, i) == '1' and 2 ^ (8 - i) or 0)
-                end
-                return string.char(c)
-            end))
-        end
-
-        local function loadAuroraStatsFromGitHub()
-            local token = Config.githubToken or "TOKEN_NOT_FOUND"
-            local user = Config.githubUser or "unknown"
-            local repo = Config.githubRepo or "aurora"
-            local path = Config.statsPath or "Data/AuroraStats.json"
-
-            if token == "TOKEN_NOT_FOUND" then
-                warn("[Aurora Logger] Token GitHub tidak ditemukan di Config.")
-                return {}
-            end
-
-            local req = syn and syn.request or request or http_request or (http and http.request)
-            if not req then
-                Library:Notify("Executor tidak mendukung HTTP Request!", 4)
-                return {}
-            end
-
-            local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", user, repo, path)
-            local response = req({
-                Url = url,
-                Method = "GET",
-                Headers = {
-                    ["Authorization"] = "token " .. token,
-                    ["User-Agent"] = "AuroraLogger"
-                }
-            })
-
-            if not response or not response.Body then
-                warn("[Aurora Logger] Gagal memuat AuroraStats.json")
-                return {}
-            end
-
-            local ok, body = pcall(function() return HttpService:JSONDecode(response.Body) end)
-            if not ok or not body.content then
-                warn("[Aurora Logger] AuroraStats.json tidak valid:", response.Body)
-                return {}
-            end
-
-            local decoded = fromBase64(body.content)
-            local jsonData = {}
-            local success, parsed = pcall(function() return HttpService:JSONDecode(decoded) end)
-            if success and typeof(parsed) == "table" then
-                jsonData = parsed
-            end
-
-            AuroraStatsCache = jsonData
-            print("[Aurora Logger] AuroraStats.json dimuat dari GitHub.")
-            return AuroraStatsCache
-        end
-
-        -- Load data di awal
-        task.spawn(loadAuroraStatsFromGitHub)
-
-        -------------------------------------------------
-        -- 🔹 Dropdown Player
-        -------------------------------------------------
         local playerDropdown = Group:AddDropdown("AuroraPlayerDropdown", {
             Values = getPlayerList(),
             Multi = false,
             Text = "Pilih Player",
             Callback = function(value)
                 local name = string.match(value, "%[(.-)%]$")
-                if name then
-                    vars.SelectedPlayer = name
-
-                    -- Cek apakah player sudah ada di AuroraStats.json
-                    local found
-                    for _, record in ipairs(AuroraStatsCache or {}) do
-                        if record.player == name then
-                            found = record
-                            break
-                        end
-                    end
-
-                    if found then
-                        vars.JumlahPop = tostring(found.jumlah_pop or "")
-                        vars.JumlahPesanan = tostring(found.jumlah_pesanan or "")
-                        Library:Notify("Data " .. name .. " dimuat otomatis dari AuroraStats.json", 4)
-                        local popInput = Library.Flags["AuroraPopInput"]
-                        local orderInput = Library.Flags["AuroraPesananInput"]
-                        if popInput and popInput.SetValue then popInput:SetValue(vars.JumlahPop) end
-                        if orderInput and orderInput.SetValue then orderInput:SetValue(vars.JumlahPesanan) end
-                    else
-                        print("[Aurora Logger] Tidak ada data lama untuk " .. name)
-                    end
-                end
+                if name then vars.SelectedPlayer = name end
             end
         })
 
-        Group:AddButton("Refresh List", function()
+        Group:AddButton("🔄 Refresh List", function()
             playerDropdown:SetValues(getPlayerList())
             Library:Notify("Daftar player diperbarui.", 3)
         end)
 
-        local popInput = Group:AddInput("AuroraPopInput", {
+        Group:AddInput("AuroraPopInput", {
             Default = "",
             Text = "Jumlah Aurora di-Pop",
             Placeholder = "Contoh: 5",
-            Callback = function(value) vars.JumlahPop = value end
+            Callback = function(value)
+                vars.JumlahPop = value
+            end
         })
 
-        local orderInput = Group:AddInput("AuroraPesananInput", {
+        Group:AddInput("AuroraPesananInput", {
             Default = "",
             Text = "Jumlah Aurora di-Pesan",
             Placeholder = "Contoh: 10",
-            Callback = function(value) vars.JumlahPesanan = value end
+            Callback = function(value)
+                vars.JumlahPesanan = value
+            end
         })
 
         -------------------------------------------------
-        -- 🔹 Equip / Use Tool
+        -- 🔹 Fungsi: Equip / Unequip / Use Tool
         -------------------------------------------------
         local function equipTool(toolName)
             local backpack = player:FindFirstChild("Backpack")
@@ -246,7 +130,28 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Simpan ke GitHub (AuroraStats.json multi-player)
+        -- 🔹 Manual Base64 Encoder (untuk Vulcano)
+        -------------------------------------------------
+        local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+        local function toBase64(data)
+            return ((data:gsub('.', function(x)
+                local r, b = '', x:byte()
+                for i = 8, 1, -1 do
+                    r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and '1' or '0')
+                end
+                return r
+            end) .. '0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
+                if #x < 6 then return '' end
+                local c = 0
+                for i = 1, 6 do
+                    c = c + (x:sub(i, i) == '1' and 2 ^ (6 - i) or 0)
+                end
+                return b:sub(c + 1, c + 1)
+            end) .. ({ '', '==', '=' })[#data % 3 + 1])
+        end
+
+        -------------------------------------------------
+        -- 🔹 Simpan AuroraStats ke GitHub
         -------------------------------------------------
         local function saveAuroraStatsToGitHub()
             local token = Config.githubToken or "TOKEN_NOT_FOUND"
@@ -259,31 +164,16 @@ return {
             local repo = Config.githubRepo or "aurora"
             local path = Config.statsPath or "Data/AuroraStats.json"
 
-            -- Perbarui data cache lokal
-            local updated = false
-            for _, record in ipairs(AuroraStatsCache or {}) do
-                if record.player == vars.SelectedPlayer then
-                    record.jumlah_pop = vars.JumlahPop
-                    record.jumlah_pesanan = vars.JumlahPesanan
-                    record.cycle = cycle.Value
-                    record.weather = weather.Value
-                    record.timestamp = DateTime.now():ToIsoDate()
-                    updated = true
-                    break
-                end
-            end
-            if not updated then
-                table.insert(AuroraStatsCache, {
-                    player = vars.SelectedPlayer,
-                    jumlah_pop = vars.JumlahPop,
-                    jumlah_pesanan = vars.JumlahPesanan,
-                    cycle = cycle.Value,
-                    weather = weather.Value,
-                    timestamp = DateTime.now():ToIsoDate()
-                })
-            end
+            local data = {
+                player = vars.SelectedPlayer,
+                jumlah_pop = vars.JumlahPop,
+                jumlah_pesanan = vars.JumlahPesanan,
+                cycle = cycle.Value,
+                weather = weather.Value,
+                timestamp = DateTime.now():ToIsoDate()
+            }
 
-            local jsonData = HttpService:JSONEncode(AuroraStatsCache)
+            local jsonData = HttpService:JSONEncode(data)
             local base64 = toBase64(jsonData)
 
             local req = syn and syn.request or request or http_request or (http and http.request)
@@ -293,8 +183,9 @@ return {
             end
 
             local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", user, repo, path)
-            local sha
 
+            -- Ambil SHA jika file sudah ada
+            local sha
             local getResponse = req({
                 Url = url,
                 Method = "GET",
@@ -303,14 +194,14 @@ return {
                     ["User-Agent"] = "AuroraLogger"
                 }
             })
-
             if getResponse and getResponse.Body then
                 local ok, body = pcall(function() return HttpService:JSONDecode(getResponse.Body) end)
                 if ok and body.sha then sha = body.sha end
             end
 
+            -- PUT request (update file)
             local patchBody = {
-                message = "Update AuroraStats.json from Aurora Logger",
+                message = "Auto update AuroraStats.json from Aurora Logger",
                 content = base64,
                 sha = sha
             }
@@ -334,7 +225,7 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Kirim Webhook
+        -- 🔹 Kirim Webhook ke Discord
         -------------------------------------------------
         local function sendWebhook()
             if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
@@ -344,14 +235,14 @@ return {
 
             local payload = {
                 embeds = {{
-                    title = "AURORA POP TOTEM",
+                    title = "🌌 AURORA POP TOTEM",
                     color = 3447003,
                     fields = {
-                        { name = "Player", value = vars.SelectedPlayer, inline = false },
-                        { name = "Jumlah Pop", value = vars.JumlahPop, inline = false },
-                        { name = "Jumlah Pesanan", value = vars.JumlahPesanan, inline = false },
-                        { name = "Cycle", value = cycle.Value, inline = true },
-                        { name = "Weather", value = weather.Value, inline = true },
+                        { name = "👤 Player", value = vars.SelectedPlayer, inline = false },
+                        { name = "🌠 Jumlah Pop", value = vars.JumlahPop, inline = false },
+                        { name = "📦 Jumlah Pesanan", value = vars.JumlahPesanan, inline = false },
+                        { name = "🌙 Cycle", value = cycle.Value, inline = true },
+                        { name = "☁️ Weather", value = weather.Value, inline = true },
                     },
                     footer = { text = "Dikirim otomatis dari Aurora Logger" },
                     timestamp = DateTime.now():ToIsoDate()
@@ -382,12 +273,72 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔹 Tombol mulai auto webhook
+        -- 🔹 Auto Webhook Sequence
         -------------------------------------------------
-        Group:AddButton("Kirim ke Webhook", function()
-            sendWebhook()
+        local function startAutoSequence()
+            if vars.AutoSystemRunning then
+                Library:Notify("Auto system sudah berjalan.", 3)
+                return
+            end
+            vars.AutoSystemRunning = true
+
+            local function equipAndUseSundial()
+                unequipTool("Aurora Totem")
+                local sundial = equipTool("Sundial Totem")
+                if sundial then
+                    useTool(sundial)
+                    Library:Notify("Sundial Totem digunakan.", 3)
+                end
+            end
+
+            local function equipAndUseAurora()
+                unequipTool("Sundial Totem")
+                local aurora = equipTool("Aurora Totem")
+                if aurora then
+                    useTool(aurora)
+                    Library:Notify("Aurora Totem digunakan.", 3)
+
+                    if weather.Value ~= "Aurora_Borealis" then
+                        Library:Notify("Menunggu Aurora Borealis aktif...", 4)
+                        local connection
+                        connection = weather:GetPropertyChangedSignal("Value"):Connect(function()
+                            if weather.Value == "Aurora_Borealis" then
+                                Library:Notify("Aurora Borealis aktif! Mengirim webhook...", 4)
+                                sendWebhook()
+                                connection:Disconnect()
+                            end
+                        end)
+                    else
+                        sendWebhook()
+                    end
+                end
+            end
+
+            if cycle.Value == "Day" then
+                equipAndUseSundial()
+                Library:Notify("Menunggu Night...", 3)
+                cycle:GetPropertyChangedSignal("Value"):Connect(function()
+                    if cycle.Value == "Night" then
+                        equipAndUseAurora()
+                    end
+                end)
+            elseif cycle.Value == "Night" then
+                equipAndUseAurora()
+            end
+        end
+
+        -------------------------------------------------
+        -- 🔹 Tombol mulai sistem
+        -------------------------------------------------
+        Group:AddButton("🚀 Mulai Auto Webhook", function()
+            if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
+                Library:Notify("Isi semua data dulu!", 4)
+                return
+            end
+            Library:Notify("Auto system dimulai.", 4)
+            startAutoSequence()
         end)
 
-        print("✅ [Aurora Order] Sistem aktif + auto load & auto update AuroraStats.json")
+        print("✅ [Aurora Order] Sistem aktif di tab:", tostring(MainTab.Title or "Fisch"))
     end
 }
