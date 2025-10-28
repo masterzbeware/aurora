@@ -37,7 +37,10 @@ if success and type(result) == "table" then
     -- 🧠 Tambahan: ambil token dari file lokal
     ---------------------------------------------------
     local ok, localToken = pcall(function()
-        return loadfile("token.lua")()
+        if isfile and readfile and isfile("token.lua") then
+            return loadstring(readfile("token.lua"))()
+        end
+        return nil
     end)
 
     if ok and type(localToken) == "string" and localToken ~= "" then
