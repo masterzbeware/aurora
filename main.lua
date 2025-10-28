@@ -2,7 +2,7 @@
 -- MasterZ HUB Loader (tanpa VIP)
 
 -- Repositori
-local repoBase     = "https://raw.githubusercontent.com/masterzbeware/aurora/main/commands/"
+local repoBase = "https://raw.githubusercontent.com/masterzbeware/aurora/main/Commands/"
 local obsidianRepo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 
 -- Load Library
@@ -25,7 +25,7 @@ _G.BotVars = {
 -- Buat Window Utama
 local MainWindow = Library:CreateWindow({
     Title = "OctoraStore | Roblox",
-    Footer = "1.1.0",
+    Footer = "1.0.0",
     Icon = 0,
 })
 
