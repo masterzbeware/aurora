@@ -17,12 +17,16 @@ local MainWindow = _G.BotVars.MainWindow
 ---------------------------------------------------
 Tabs.Info = MainWindow:AddTab("Info", "info")
 
--- Group kiri: Bot Info
+---------------------------------------------------
+-- 🔹 Group kiri: Bot Info
+---------------------------------------------------
 local BotGroup = Tabs.Info:AddLeftGroupbox("Bot Info")
 BotGroup:AddLabel("OctoraStore | Roblox")
 BotGroup:AddLabel("Script loaded")
 
--- Group kanan: Server Info
+---------------------------------------------------
+-- 🔹 Group kanan: Server Info
+---------------------------------------------------
 local ServerGroup = Tabs.Info:AddRightGroupbox("Server Info")
 
 -- Label dinamis
@@ -32,7 +36,59 @@ local regionLabel  = ServerGroup:AddLabel("Server Region: ...")
 local timeLabel    = ServerGroup:AddLabel("In Server: ...")
 
 ---------------------------------------------------
--- ✅ Fungsi update otomatis
+-- ✅ Group tambahan: Aurora Stats
+---------------------------------------------------
+local AuroraGroup = Tabs.Info:AddRightGroupbox("Aurora Stats")
+
+-- Label awal
+local playerLabel = AuroraGroup:AddLabel("Player: ...")
+local popLabel = AuroraGroup:AddLabel("Jumlah Pop: ...")
+local orderLabel = AuroraGroup:AddLabel("Jumlah Pesanan: ...")
+
+-- Fungsi untuk memuat data dari AuroraStats.json
+local function updateAuroraStats()
+    local statsPath = "AuroraStats.json"
+    if not isfile or not readfile then
+        warn("[AuroraStats] Fungsi file tidak tersedia (executor tidak mendukung).")
+        return
+    end
+
+    if not isfile(statsPath) then
+        -- Jika belum ada file, buat dummy
+        local dummy = {
+            player = game.Players.LocalPlayer and game.Players.LocalPlayer.Name or "Unknown",
+            pop = 0,
+            orders = 0
+        }
+        writefile(statsPath, game:GetService("HttpService"):JSONEncode(dummy))
+    end
+
+    -- Coba baca file JSON
+    local success, data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(readfile(statsPath))
+    end)
+
+    if success and type(data) == "table" then
+        playerLabel:SetText("Player: " .. tostring(data.player or "N/A"))
+        popLabel:SetText("Jumlah Pop: " .. tostring(data.pop or 0))
+        orderLabel:SetText("Jumlah Pesanan: " .. tostring(data.orders or 0))
+    else
+        warn("[AuroraStats] Gagal membaca JSON.")
+    end
+end
+
+-- Jalankan update awal
+updateAuroraStats()
+
+-- Loop update tiap 5 detik
+task.spawn(function()
+    while task.wait(5) do
+        pcall(updateAuroraStats)
+    end
+end)
+
+---------------------------------------------------
+-- ✅ Fungsi update otomatis Info Tab
 ---------------------------------------------------
 
 -- Jumlah pemain
