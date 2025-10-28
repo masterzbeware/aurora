@@ -1,5 +1,5 @@
 -- Commands/Order.lua
--- Aurora Logger + Auto Webhook System (Fixed + Inline Embed + GitHub Auto Update JSON)
+-- Aurora Logger + Auto Webhook System (Vulcano Compatible + Base64 Manual + GitHub Auto Update JSON)
 
 return {
   Execute = function(tab)
@@ -129,6 +129,27 @@ return {
       end
 
       -------------------------------------------------
+      -- 🔹 Base64 Encoder Manual (karena HttpService tidak punya Base64Encode di Vulcano)
+      -------------------------------------------------
+      local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      local function toBase64(data)
+          return ((data:gsub('.', function(x)
+              local r, b = '', x:byte()
+              for i = 8, 1, -1 do
+                  r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and '1' or '0')
+              end
+              return r
+          end) .. '0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
+              if #x < 6 then return '' end
+              local c = 0
+              for i = 1, 6 do
+                  c = c + (x:sub(i, i) == '1' and 2 ^ (6 - i) or 0)
+              end
+              return b:sub(c + 1, c + 1)
+          end) .. ({ '', '==', '=' })[#data % 3 + 1])
+      end
+
+      -------------------------------------------------
       -- 🔹 Simpan ke GitHub sebagai AuroraStats.json
       -------------------------------------------------
       local function saveAuroraStatsToGitHub()
@@ -140,9 +161,8 @@ return {
 
           local user = Config.githubUser or "unknown"
           local repo = Config.githubRepo or "aurora"
-          local path = Config.statsPath or "AuroraStats.json"
+          local path = Config.statsPath or "Data/AuroraStats.json"
 
-          -- 🔹 Data yang akan dikirim
           local data = {
               player = vars.SelectedPlayer,
               jumlah_pop = vars.JumlahPop,
@@ -153,7 +173,7 @@ return {
           }
 
           local jsonData = HttpService:JSONEncode(data)
-          local base64 = game:GetService("HttpService"):Base64Encode(jsonData)
+          local base64 = toBase64(jsonData)
 
           local req = syn and syn.request or request or http_request or (http and http.request)
           if not req then
@@ -162,6 +182,9 @@ return {
           end
 
           local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", user, repo, path)
+
+          -- Ambil SHA jika file sudah ada
+          local sha
           local getResponse = req({
               Url = url,
               Method = "GET",
@@ -170,13 +193,12 @@ return {
                   ["User-Agent"] = "AuroraLogger"
               }
           })
-
-          local sha
           if getResponse and getResponse.Body then
               local ok, body = pcall(function() return HttpService:JSONDecode(getResponse.Body) end)
               if ok and body.sha then sha = body.sha end
           end
 
+          -- PUT request
           local patchBody = {
               message = "Auto update AuroraStats.json from Aurora Logger",
               content = base64,
@@ -194,7 +216,7 @@ return {
               Body = HttpService:JSONEncode(patchBody)
           })
 
-          if response and response.StatusCode == 200 then
+          if response and (response.StatusCode == 200 or response.StatusCode == 201) then
               Library:Notify("✅ AuroraStats.json berhasil disimpan ke GitHub!", 4)
           else
               warn("[Aurora Logger] Gagal menyimpan AuroraStats.json:", response and response.Body)
@@ -243,7 +265,7 @@ return {
 
           if success then
               Library:Notify("Webhook terkirim! Aurora Borealis aktif!", 4)
-              saveAuroraStatsToGitHub() -- 🔹 simpan JSON otomatis
+              saveAuroraStatsToGitHub()
           else
               Library:Notify("Gagal mengirim webhook: " .. tostring(err), 4)
           end
