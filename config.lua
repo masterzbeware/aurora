@@ -8,8 +8,8 @@ return {
     end)
     return token or "TOKEN_NOT_FOUND"
   end)(),
-  
+
   githubUser = "masterzbeware",
   githubRepo = "aurora",
-  statsPath = "data/AuroraStats.lua"
+  statsPath = "Data/AuroraStats.json" -- ✅ perbaikan besar: huruf D & .json
 }
