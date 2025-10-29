@@ -19,25 +19,6 @@ local latencyLabel = ServerGroup:AddLabel("Latency: ...")
 local regionLabel  = ServerGroup:AddLabel("Server Region: ...")
 local timeLabel    = ServerGroup:AddLabel("In Server: ...")
 
-local AuroraGroup = Tabs.Info:AddRightGroupbox("Aurora Stats")
-
-local function updateAuroraStats()
-    local statsPath = "AuroraStats.json"
-    if not isfile or not readfile then return end
-    if not isfile(statsPath) then
-        local dummy = {}
-        writefile(statsPath, game:GetService("HttpService"):JSONEncode(dummy))
-    end
-end
-
-updateAuroraStats()
-
-task.spawn(function()
-    while task.wait(3) do
-        pcall(updateAuroraStats)
-    end
-end)
-
 local function updateLatency()
     local stats = game:GetService("Stats")
     local ping = stats.Network.ServerStatsItem["Data Ping"]:GetValue()
