@@ -6,7 +6,7 @@ return {
         local MainTab = tab or Tabs.Fisch
 
         if not Library or not MainTab then
-            warn("[Aurora Logger] Gagal inisialisasi — Library atau Tab tidak ditemukan.")
+            warn("Gagal inisialisasi — Library atau Tab tidak ditemukan.")
             return
         end
 
@@ -14,12 +14,11 @@ return {
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
         local HttpService = game:GetService("HttpService")
         local player = Players.LocalPlayer
-        local world = ReplicatedStorage:WaitForChild("world", 10)
+        local world = ReplicatedStorage:WaitForChild("World", 10)
         if not world then return end
 
-        local cycle = world:WaitForChild("cycle", 10)
-        local weather = world:WaitForChild("weather", 10)
-        if not cycle or not weather then return end
+        local cycle = world:WaitForChild("Cycle", 10)
+        local weather = world:FindFirstChild("Weather") or Instance.new("StringValue")
 
         local webhookURL = "https://discord.com/api/webhooks/1426999320590422237/MRBvIpOriZD1sJGd--F2A4RfFYEMdXEvPFHOJ5ZyUjogYlUEeDLkWpGcc0ZI4vn43ofR"
 
@@ -42,12 +41,10 @@ return {
             Text = "Pilih Player",
         }):OnChanged(function(value)
             vars.SelectedPlayer = value
-            Library:Notify("Dipilih: " .. value, 3)
         end)
 
         Group:AddInput("JumlahPop", {
             Default = "",
-            Numeric = false,
             Text = "Jumlah Pop",
             Placeholder = "Contoh: 5",
         }):OnChanged(function(value)
@@ -56,7 +53,6 @@ return {
 
         Group:AddInput("JumlahPesanan", {
             Default = "",
-            Numeric = false,
             Text = "Jumlah Pesanan",
             Placeholder = "Contoh: 10",
         }):OnChanged(function(value)
@@ -87,26 +83,26 @@ return {
 
         local function useTool(tool)
             if tool and tool:IsA("Tool") then
-                task.wait(0.4)
+                task.wait(0.3)
                 tool:Activate()
             end
         end
 
         local function sendWebhook()
             local payload = {
-                embeds = {{
+                embeds = { {
                     title = "AURORA TOTEM LOGGER",
                     color = 3447003,
                     fields = {
-                        { name = "Player", value = vars.SelectedPlayer ~= "" and vars.SelectedPlayer or player.Name, inline = false },
-                        { name = "Jumlah Pop", value = vars.JumlahPop ~= "" and vars.JumlahPop or "-", inline = true },
-                        { name = "Jumlah Pesanan", value = vars.JumlahPesanan ~= "" and vars.JumlahPesanan or "-", inline = true },
-                        { name = "Cycle", value = cycle.Value, inline = true },
-                        { name = "Weather", value = weather.Value, inline = true },
+                        { name = "Player", value = vars.SelectedPlayer ~= "" and vars.SelectedPlayer or player.Name },
+                        { name = "Jumlah Pop", value = vars.JumlahPop ~= "" and vars.JumlahPop or "-" },
+                        { name = "Jumlah Pesanan", value = vars.JumlahPesanan ~= "" and vars.JumlahPesanan or "-" },
+                        { name = "Cycle", value = cycle.Value },
+                        { name = "Weather", value = weather.Value },
                     },
                     footer = { text = "Aurora Logger Otomatis" },
                     timestamp = DateTime.now():ToIsoDate()
-                }}
+                } }
             }
 
             local req = syn and syn.request or request or http_request or (http and http.request)
@@ -125,7 +121,7 @@ return {
             end)
 
             if ok then
-                Library:Notify("Webhook terkirim, sistem berhenti otomatis.", 5)
+                Library:Notify("Webhook terkirim.", 4)
             else
                 Library:Notify("Gagal kirim webhook: " .. tostring(err), 4)
             end
@@ -138,48 +134,57 @@ return {
             end
 
             vars.AutoSystemRunning = true
-            Library:Notify("Memulai Auto Webhook...", 4)
+            Library:Notify("Memulai pemantauan realtime Cycle...", 4)
 
             task.spawn(function()
-                while vars.AutoSystemRunning do
-                    task.wait(1)
+                local connection
+                connection = cycle:GetPropertyChangedSignal("Value"):Connect(function()
+                    if not vars.AutoSystemRunning then connection:Disconnect() return end
 
-                    if cycle.Value == "Night" then
-                        unequipTool("Aurora Totem")
+                    local val = cycle.Value
+
+                    if val == "Night" then
                         local sundial = equipTool("Sundial Totem")
                         if sundial then useTool(sundial) end
 
-                        repeat task.wait(1) until cycle.Value == "Day"
+                        repeat task.wait(0.5) until cycle.Value == "Day" or not vars.AutoSystemRunning
+                        if not vars.AutoSystemRunning then return end
+
                         local sundial2 = equipTool("Sundial Totem")
                         if sundial2 then useTool(sundial2) end
 
-                        repeat task.wait(1) until cycle.Value == "Night"
+                        repeat task.wait(0.5) until cycle.Value == "Night" or not vars.AutoSystemRunning
+                        if not vars.AutoSystemRunning then return end
+
                         local aurora = equipTool("Aurora Totem")
                         if aurora then useTool(aurora) end
 
-                        task.wait(2)
-                        if weather.Value ~= "Aurora_Borealis" then
-                            sendWebhook()
-                            vars.AutoSystemRunning = false
-                            break
-                        end
-
-                    elseif cycle.Value == "Day" then
-                        unequipTool("Aurora Totem")
+                        sendWebhook()
+                        vars.AutoSystemRunning = false
+                        connection:Disconnect()
+                    elseif val == "Day" then
                         local sundial = equipTool("Sundial Totem")
                         if sundial then useTool(sundial) end
 
-                        repeat task.wait(1) until cycle.Value == "Night"
+                        repeat task.wait(0.5) until cycle.Value == "Night" or not vars.AutoSystemRunning
+                        if not vars.AutoSystemRunning then return end
+
                         local aurora = equipTool("Aurora Totem")
                         if aurora then useTool(aurora) end
 
-                        task.wait(2)
-                        if weather.Value ~= "Aurora_Borealis" then
-                            sendWebhook()
-                            vars.AutoSystemRunning = false
-                            break
-                        end
+                        sendWebhook()
+                        vars.AutoSystemRunning = false
+                        connection:Disconnect()
                     end
+                end)
+
+                local firstCheck = cycle.Value
+                if firstCheck == "Night" then
+                    local sundial = equipTool("Sundial Totem")
+                    if sundial then useTool(sundial) end
+                elseif firstCheck == "Day" then
+                    local sundial = equipTool("Sundial Totem")
+                    if sundial then useTool(sundial) end
                 end
             end)
         end
@@ -188,7 +193,5 @@ return {
             if vars.SelectedPlayer == "" then vars.SelectedPlayer = player.Name end
             startAutoWebhook()
         end)
-
-        print("[Aurora Order] Sistem aktif di tab:", tostring(MainTab.Title or "Fisch"))
     end
 }
