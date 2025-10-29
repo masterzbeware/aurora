@@ -37,6 +37,9 @@ return {
 
         local Group = MainTab:AddLeftGroupbox("Aurora Totem")
 
+        -------------------------------------------------
+        -- UI Elements
+        -------------------------------------------------
         local function getPlayerList()
             local list = {}
             for _, plr in ipairs(Players:GetPlayers()) do
@@ -78,6 +81,9 @@ return {
             end
         })
 
+        -------------------------------------------------
+        -- Core Helper Functions
+        -------------------------------------------------
         local function equipTool(toolName)
             local backpack = player:FindFirstChild("Backpack")
             if not backpack then return end
@@ -109,6 +115,9 @@ return {
             end
         end
 
+        -------------------------------------------------
+        -- Webhook Function
+        -------------------------------------------------
         local function sendWebhook()
             if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
                 Library:Notify("Isi Player, Jumlah Pop, dan Pesanan dulu!", 4)
@@ -154,7 +163,7 @@ return {
         end
 
         -------------------------------------------------
-        -- 🔁 AUTO CYCLE SYSTEM (Fixed Version)
+        -- 🔁 AUTO LOOP REALTIME (FINAL FIX)
         -------------------------------------------------
         local function startAutoSequence()
             if vars.AutoSystemRunning then
@@ -169,9 +178,9 @@ return {
                 if sundial then
                     task.wait(0.5)
                     useTool(sundial)
-                    Library:Notify("☀️ Sundial Totem digunakan (ubah jadi Day).", 3)
+                    Library:Notify("☀️ Sundial Totem digunakan.", 3)
                 else
-                    Library:Notify("Tidak menemukan Sundial Totem di Backpack!", 3)
+                    Library:Notify("Sundial Totem tidak ditemukan!", 3)
                 end
             end
 
@@ -181,7 +190,7 @@ return {
                 if aurora then
                     task.wait(0.5)
                     useTool(aurora)
-                    Library:Notify("🌌 Aurora Totem digunakan (Night aktif).", 3)
+                    Library:Notify("🌌 Aurora Totem digunakan.", 3)
 
                     if weather.Value ~= "Aurora_Borealis" then
                         local connection
@@ -196,38 +205,53 @@ return {
                         sendWebhook()
                     end
                 else
-                    Library:Notify("Tidak menemukan Aurora Totem di Backpack!", 3)
+                    Library:Notify("Aurora Totem tidak ditemukan!", 3)
                 end
             end
 
-            -- Jalankan logic awal sesuai kondisi cycle sekarang
-            if cycle.Value == "Night" then
-                equipAndUseSundial()
-            elseif cycle.Value == "Day" then
-                equipAndUseAurora()
-            end
+            task.spawn(function()
+                local state = "INIT" -- INIT / WAIT_DAY / WAIT_NIGHT
+                local lastCycle = cycle.Value
 
-            -- 🔁 Listener global agar selalu berjalan setiap pergantian day/night
-            cycle:GetPropertyChangedSignal("Value"):Connect(function()
-                local newCycle = cycle.Value
-                print("[Cycle Changed] Sekarang:", newCycle)
+                while vars.AutoSystemRunning do
+                    task.wait(1) -- cek setiap 1 detik
+                    local now = cycle.Value
 
-                if newCycle == "Night" then
-                    equipAndUseAurora()
-                elseif newCycle == "Day" then
-                    equipAndUseSundial()
+                    if state == "INIT" then
+                        if now == "Night" then
+                            equipAndUseSundial()
+                            state = "WAIT_DAY"
+                            print("[STATE] Night detected → use Sundial → waiting Day")
+                        elseif now == "Day" then
+                            equipAndUseSundial()
+                            state = "WAIT_NIGHT"
+                            print("[STATE] Day detected → Sundial refresh → waiting Night")
+                        end
+
+                    elseif state == "WAIT_DAY" and now == "Day" then
+                        equipAndUseSundial()
+                        state = "WAIT_NIGHT"
+                        print("[STATE] Switched to Day → Sundial used again → waiting Night")
+
+                    elseif state == "WAIT_NIGHT" and now == "Night" then
+                        equipAndUseAurora()
+                        state = "WAIT_DAY"
+                        print("[STATE] Switched to Night → Aurora used → waiting Day")
+                    end
                 end
             end)
 
-            Library:Notify("🔄 Auto Aurora Cycle aktif — sistem akan terus berputar setiap pergantian Day/Night.", 5)
+            Library:Notify("🔄 Sistem realtime aktif — akan cek cycle setiap 1 detik.", 5)
         end
 
+        -------------------------------------------------
+        -- Button Start
+        -------------------------------------------------
         Group:AddButton("Mulai Auto Webhook", function()
             if vars.SelectedPlayer == "" or vars.JumlahPop == "" or vars.JumlahPesanan == "" then
                 Library:Notify("Isi semua data dulu!", 4)
                 return
             end
-            Library:Notify("Auto system dimulai.", 4)
             startAutoSequence()
         end)
 
