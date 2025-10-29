@@ -153,6 +153,9 @@ return {
             end
         end
 
+        -------------------------------------------------
+        -- 🔁 AUTO CYCLE SYSTEM (Fixed Version)
+        -------------------------------------------------
         local function startAutoSequence()
             if vars.AutoSystemRunning then
                 Library:Notify("Auto system sudah berjalan.", 3)
@@ -164,8 +167,11 @@ return {
                 unequipTool("Aurora Totem")
                 local sundial = equipTool("Sundial Totem")
                 if sundial then
+                    task.wait(0.5)
                     useTool(sundial)
-                    Library:Notify("Sundial Totem digunakan.", 3)
+                    Library:Notify("☀️ Sundial Totem digunakan (ubah jadi Day).", 3)
+                else
+                    Library:Notify("Tidak menemukan Sundial Totem di Backpack!", 3)
                 end
             end
 
@@ -173,14 +179,15 @@ return {
                 unequipTool("Sundial Totem")
                 local aurora = equipTool("Aurora Totem")
                 if aurora then
+                    task.wait(0.5)
                     useTool(aurora)
-                    Library:Notify("Aurora Totem digunakan.", 3)
+                    Library:Notify("🌌 Aurora Totem digunakan (Night aktif).", 3)
+
                     if weather.Value ~= "Aurora_Borealis" then
-                        Library:Notify("Menunggu Aurora Borealis aktif...", 4)
                         local connection
                         connection = weather:GetPropertyChangedSignal("Value"):Connect(function()
                             if weather.Value == "Aurora_Borealis" then
-                                Library:Notify("Aurora Borealis aktif! Mengirim webhook...", 4)
+                                Library:Notify("✨ Aurora Borealis aktif! Mengirim webhook...", 4)
                                 sendWebhook()
                                 connection:Disconnect()
                             end
@@ -188,26 +195,31 @@ return {
                     else
                         sendWebhook()
                     end
+                else
+                    Library:Notify("Tidak menemukan Aurora Totem di Backpack!", 3)
                 end
             end
 
-            if cycle.Value == "Day" then
+            -- Jalankan logic awal sesuai kondisi cycle sekarang
+            if cycle.Value == "Night" then
                 equipAndUseSundial()
-                Library:Notify("Menunggu Night...", 3)
-                cycle:GetPropertyChangedSignal("Value"):Connect(function()
-                    if cycle.Value == "Night" then
-                        equipAndUseAurora()
-                    end
-                end)
-            elseif cycle.Value == "Night" then
-                equipAndUseSundial()
-                Library:Notify("Menunggu Day untuk reset...", 3)
-                cycle:GetPropertyChangedSignal("Value"):Connect(function()
-                    if cycle.Value == "Day" then
-                        equipAndUseSundial()
-                    end
-                end)
+            elseif cycle.Value == "Day" then
+                equipAndUseAurora()
             end
+
+            -- 🔁 Listener global agar selalu berjalan setiap pergantian day/night
+            cycle:GetPropertyChangedSignal("Value"):Connect(function()
+                local newCycle = cycle.Value
+                print("[Cycle Changed] Sekarang:", newCycle)
+
+                if newCycle == "Night" then
+                    equipAndUseAurora()
+                elseif newCycle == "Day" then
+                    equipAndUseSundial()
+                end
+            end)
+
+            Library:Notify("🔄 Auto Aurora Cycle aktif — sistem akan terus berputar setiap pergantian Day/Night.", 5)
         end
 
         Group:AddButton("Mulai Auto Webhook", function()
