@@ -1,5 +1,5 @@
 -- Commands/Order.lua
--- 🌌 Aurora Auto Cycle & Webhook System (Realtime Cycle Monitor)
+-- 🌌 Aurora Auto Webhook Realtime (Stop setelah webhook terkirim)
 
 return {
     Execute = function(tab)
@@ -31,6 +31,9 @@ return {
             return
         end
 
+        -----------------------------------------------------
+        -- 🔹 Konfigurasi
+        -----------------------------------------------------
         local webhookURL = "https://discord.com/api/webhooks/1426999320590422237/MRBvIpOriZD1sJGd--F2A4RfFYEMdXEvPFHOJ5ZyUjogYlUEeDLkWpGcc0ZI4vn43ofR"
 
         vars.SelectedPlayer = vars.SelectedPlayer or ""
@@ -41,51 +44,7 @@ return {
         local Group = MainTab:AddLeftGroupbox("Aurora Totem")
 
         -----------------------------------------------------
-        -- 🔹 UI INPUT
-        -----------------------------------------------------
-        local function getPlayerList()
-            local list = {}
-            for _, plr in ipairs(Players:GetPlayers()) do
-                table.insert(list, plr.DisplayName .. " [" .. plr.Name .. "]")
-            end
-            return list
-        end
-
-        local playerDropdown = Group:AddDropdown("AuroraPlayerDropdown", {
-            Values = getPlayerList(),
-            Multi = false,
-            Text = "Pilih Player",
-            Callback = function(value)
-                local name = string.match(value, "%[(.-)%]$")
-                if name then vars.SelectedPlayer = name end
-            end
-        })
-
-        Group:AddButton("Refresh List", function()
-            playerDropdown:SetValues(getPlayerList())
-            Library:Notify("Daftar player diperbarui.", 3)
-        end)
-
-        Group:AddInput("AuroraPopInput", {
-            Default = "",
-            Text = "Jumlah Aurora di-Pop",
-            Placeholder = "Contoh: 5",
-            Callback = function(value)
-                vars.JumlahPop = value
-            end
-        })
-
-        Group:AddInput("AuroraPesananInput", {
-            Default = "",
-            Text = "Jumlah Aurora di-Pesan",
-            Placeholder = "Contoh: 10",
-            Callback = function(value)
-                vars.JumlahPesanan = value
-            end
-        })
-
-        -----------------------------------------------------
-        -- 🔹 UTILITAS
+        -- 🔹 Utility
         -----------------------------------------------------
         local function equipTool(toolName)
             local backpack = player:FindFirstChild("Backpack")
@@ -120,12 +79,12 @@ return {
         end
 
         -----------------------------------------------------
-        -- 🔹 WEBHOOK FUNCTION
+        -- 🔹 Webhook Kirim
         -----------------------------------------------------
         local function sendWebhook()
             local payload = {
                 embeds = {{
-                    title = "🌌 AURORA POP TOTEM",
+                    title = "🌌 AURORA TOTEM LOGGER",
                     color = 3447003,
                     fields = {
                         { name = "Player", value = vars.SelectedPlayer ~= "" and vars.SelectedPlayer or player.Name, inline = false },
@@ -157,63 +116,67 @@ return {
             if ok then
                 Library:Notify("Webhook terkirim — Aurora Borealis aktif!", 4)
             else
-                Library:Notify("Gagal mengirim webhook: " .. tostring(err), 4)
+                Library:Notify("Gagal kirim webhook: " .. tostring(err), 4)
             end
         end
 
         -----------------------------------------------------
-        -- 🔹 FUNGSI UTAMA (REALTIME CHECK)
+        -- 🔹 Fungsi Utama (Realtime)
         -----------------------------------------------------
-        local function realtimeCycleMonitor()
+        local function startAutoWebhook()
             if vars.AutoSystemRunning then
                 Library:Notify("Sistem sudah berjalan.", 3)
                 return
             end
-            vars.AutoSystemRunning = true
 
-            Library:Notify("Memulai pemantauan cycle secara realtime...", 4)
+            vars.AutoSystemRunning = true
+            Library:Notify("Memulai Auto Webhook Realtime...", 4)
 
             task.spawn(function()
                 while vars.AutoSystemRunning do
-                    task.wait(2)
+                    task.wait(1)
 
                     if cycle.Value == "Night" then
-                        -- Night: Gunakan Sundial, tunggu jadi Day
+                        print("[Cycle] Night terdeteksi — gunakan Sundial Totem")
                         unequipTool("Aurora Totem")
                         local sundial = equipTool("Sundial Totem")
                         if sundial then useTool(sundial) end
-                        print("[Cycle] Night → Sundial digunakan")
 
                         repeat task.wait(1) until cycle.Value == "Day"
+                        print("[Cycle] Day terdeteksi — gunakan Sundial Totem ulang")
                         local sundial2 = equipTool("Sundial Totem")
                         if sundial2 then useTool(sundial2) end
-                        print("[Cycle] Day → Sundial digunakan ulang")
 
                         repeat task.wait(1) until cycle.Value == "Night"
+                        print("[Cycle] Night lagi — gunakan Aurora Totem")
                         local aurora = equipTool("Aurora Totem")
                         if aurora then useTool(aurora) end
-                        print("[Cycle] Night lagi → Aurora digunakan")
 
                         task.wait(2)
                         if weather.Value ~= "Aurora_Borealis" then
                             sendWebhook()
+                            vars.AutoSystemRunning = false
+                            Library:Notify("Webhook terkirim — sistem otomatis berhenti.", 5)
+                            break
                         end
 
                     elseif cycle.Value == "Day" then
-                        -- Day: Gunakan Sundial, tunggu Night, lalu Aurora
+                        print("[Cycle] Day terdeteksi — gunakan Sundial Totem")
                         unequipTool("Aurora Totem")
                         local sundial = equipTool("Sundial Totem")
                         if sundial then useTool(sundial) end
-                        print("[Cycle] Day → Sundial digunakan")
 
                         repeat task.wait(1) until cycle.Value == "Night"
+                        print("[Cycle] Night terdeteksi — gunakan Aurora Totem")
                         local aurora = equipTool("Aurora Totem")
                         if aurora then useTool(aurora) end
-                        print("[Cycle] Night → Aurora digunakan")
 
                         task.wait(2)
                         if weather.Value ~= "Aurora_Borealis" then
                             sendWebhook()
+                            vars.AutoSystemRunning = false
+                            Library:Notify("Webhook terkirim — sistem otomatis berhenti.", 5)
+                            break
                         end
                     end
                 end
@@ -221,19 +184,12 @@ return {
         end
 
         -----------------------------------------------------
-        -- 🔹 TOMBOL UTAMA
+        -- 🔹 Tombol UI
         -----------------------------------------------------
-        Group:AddButton("Mulai Kirim Webhook (Realtime)", function()
-            if vars.SelectedPlayer == "" then
-                vars.SelectedPlayer = player.Name
-            end
-            Library:Notify("Sistem webhook realtime dijalankan.", 4)
-            realtimeCycleMonitor()
-        end)
-
-        Group:AddButton("Hentikan Sistem", function()
-            vars.AutoSystemRunning = false
-            Library:Notify("Sistem dihentikan.", 4)
+        Group:AddButton("Mulai Auto Webhook", function()
+            if vars.SelectedPlayer == "" then vars.SelectedPlayer = player.Name end
+            Library:Notify("Auto Webhook dimulai.", 4)
+            startAutoWebhook()
         end)
 
         print("[Aurora Order] Sistem aktif di tab:", tostring(MainTab.Title or "Fisch"))
