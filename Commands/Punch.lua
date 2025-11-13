@@ -23,8 +23,8 @@ return {
         vars.AutoPunchEnabled = vars.AutoPunchEnabled or false
 
         -- parameter umum
-        local range = 3      -- jarak maksimum untuk pukul block
-        local delay = 0.05    -- delay antar pukulan (semakin kecil = lebih cepat)
+        local range = 3       -- jarak maksimum untuk pukul block
+        local delay = 0.12    -- delay antar pukulan (aman & cepat)
 
         ----------------------------------------------------------------
         -- Fungsi: cari block Dirt terdekat dalam jarak yang bisa dijangkau
@@ -49,6 +49,18 @@ return {
         end
 
         ----------------------------------------------------------------
+        -- Fungsi: punch block aman
+        ----------------------------------------------------------------
+        local function punchBlock(block)
+            if block and block.Parent == WorldBlocks then
+                local args = { block }
+                pcall(function()
+                    PunchEvent:FireServer(unpack(args))
+                end)
+            end
+        end
+
+        ----------------------------------------------------------------
         -- Fungsi utama auto punch (loop background)
         ----------------------------------------------------------------
         local function startAutoPunch()
@@ -62,14 +74,11 @@ return {
                 while vars.AutoPunchEnabled do
                     local target = getClosestDirt()
                     if target then
-                        -- pukul sampai block hancur atau jarak terlalu jauh
-                        while vars.AutoPunchEnabled and target.Parent == WorldBlocks do
-                            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-                            if not hrp then break end
-                            local dist = (target:GetPivot().Position - hrp.Position).Magnitude
-                            if dist > range then break end
+                        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        if not hrp then break end
 
-                            PunchEvent:FireServer(target)
+                        while vars.AutoPunchEnabled and target.Parent == WorldBlocks and hrp and (target:GetPivot().Position - hrp.Position).Magnitude <= range do
+                            punchBlock(target)
                             task.wait(delay)
                         end
                     else
@@ -94,8 +103,6 @@ return {
             vars.AutoPunchEnabled = state
             if state then
                 startAutoPunch()
-            else
-                vars.AutoPunchEnabled = false
             end
         end)
     end
